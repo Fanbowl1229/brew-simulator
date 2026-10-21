@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-HK">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#000000" />
+  <meta name="description" content="手沖咖啡沖煮模擬器 — 劑量、比例、研磨、濾杯、經典配方即時建議" />
+  <title>手沖沖煮模擬器</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="bg-glow bg-glow-1" aria-hidden="true"></div>
+  <div class="bg-glow bg-glow-2" aria-hidden="true"></div>
+
+  <header class="app-header">
+    <div class="header-art" aria-hidden="true">
+      <svg class="icon-dripper" viewBox="0 0 64 72" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M10 18 L32 58 L54 18 Z" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/>
+        <path d="M18 18 H46" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+        <path d="M22 10 H42" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity="0.7"/>
+        <path d="M26 4 H38" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" opacity="0.45"/>
+        <path d="M32 58 V66" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity="0.85"/>
+        <circle cx="32" cy="68.5" r="2.2" fill="currentColor" opacity="0.7"/>
+        <path d="M28 28 Q32 32 36 28 Q32 36 28 32" stroke="currentColor" stroke-width="1.4" fill="none" opacity="0.5"/>
+      </svg>
+      <div class="header-titles">
+        <h1>手沖沖煮模擬器</h1>
+        <p class="subtitle">濾杯 · 豆資訊 · 經典配方 · 注水時間表</p>
+      </div>
+      <svg class="icon-cup" viewBox="0 0 64 56" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M12 16 H44 V36 C44 42 38 46 28 46 C18 46 12 42 12 36 V16 Z" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/>
+        <path d="M44 20 H52 C56 20 58 24 58 28 C58 32 56 36 52 36 H44" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/>
+        <path d="M16 50 H40" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity="0.55"/>
+        <path d="M20 10 C20 6 24 6 24 10 C24 14 20 14 20 10" stroke="currentColor" stroke-width="1.5" fill="none" opacity="0.55"/>
+        <path d="M28 8 C28 4 32 4 32 8 C32 12 28 12 28 8" stroke="currentColor" stroke-width="1.5" fill="none" opacity="0.4"/>
+        <path d="M36 10 C36 6 40 6 40 10 C40 14 36 14 36 10" stroke="currentColor" stroke-width="1.5" fill="none" opacity="0.55"/>
+      </svg>
+    </div>
+    <svg class="header-divider" viewBox="0 0 320 12" preserveAspectRatio="none" aria-hidden="true">
+      <path d="M0 6 Q40 0 80 6 T160 6 T240 6 T320 6" stroke="currentColor" stroke-width="1.2" fill="none" opacity="0.55"/>
+      <circle cx="160" cy="6" r="2.5" fill="currentColor" opacity="0.7"/>
+    </svg>
+  </header>
+
+  <main class="app">
+    <!-- ① 沖法與配方 -->
+    <section class="card collapsible open" data-section="style-recipe" aria-labelledby="sec-style">
+      <button type="button" class="collapse-toggle" aria-expanded="true" id="sec-style">
+        <svg class="h2-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M5 19 L12 5 L19 19 Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+          <circle cx="12" cy="21" r="1.2" fill="currentColor"/>
+        </svg>
+        <span>沖法與配方</span>
+        <span class="chevron" aria-hidden="true">▾</span>
+      </button>
+      <div class="collapse-body">
+        <div class="field-row">
+          <label for="brewStyle">沖法</label>
+          <select id="brewStyle">
+            <option value="pour-over" selected>手沖（Pour-over）</option>
+            <option value="immersion">濾泡（浸泡／Clever／Switch）</option>
+            <option value="cold">冷萃（Cold brew）</option>
+            <option value="iced">冰咖啡（日式冰手沖）</option>
+          </select>
+        </div>
+
+        <div class="field-row">
+          <label for="recipePick">經典／冠軍配方</label>
+          <select id="recipePick">
+            <option value="">— 自訂／唔用配方 —</option>
+          </select>
+        </div>
+
+        <div class="field-row" id="pourStyleRow">
+          <label for="pourStyle">注水風格</label>
+          <select id="pourStyle">
+            <option value="3pour" selected>三段式（3 pour）</option>
+            <option value="4equal">四段等量</option>
+            <option value="5equal">五段等量</option>
+            <option value="ufo-official">UFO 官方風格</option>
+            <option value="bloom3">悶蒸 + 三段</option>
+          </select>
+        </div>
+
+        <div class="field-row" id="bloomRow">
+          <label for="bloomWait">悶蒸等待 (秒) <span id="bloomWaitValue">45</span></label>
+          <input type="range" id="bloomWait" min="20" max="90" step="5" value="45" />
+        </div>
+
+        <div class="field-row hidden" id="coldSteepRow">
+          <label for="coldSteepHours">浸泡時間 (小時) <span id="coldSteepValue">14</span></label>
+          <input type="range" id="coldSteepHours" min="8" max="24" step="1" value="14" />
+        </div>
+
+        <div class="field-row toggle-row" id="icedToggleRow">
+          <label for="iced">冰手沖（日式・熱水分 + 冰）</label>
+          <button type="button" id="iced" class="toggle" role="switch" aria-checked="false">關</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ② 濾杯與濾紙 -->
+    <section class="card collapsible open" data-section="brewer-filter" aria-labelledby="sec-brewer">
+      <button type="button" class="collapse-toggle" aria-expanded="true" id="sec-brewer">
+        <svg class="h2-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M6 6 H18 L12 18 Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+        </svg>
+        <span>濾杯與濾紙</span>
+        <span class="chevron" aria-hidden="true">▾</span>
+      </button>
+      <div class="collapse-body">
+        <div class="field-row">
+          <label for="brewer">濾杯</label>
+          <select id="brewer">
+            <optgroup label="錐形 Cone">
+              <option value="v60" selected>Hario V60（通用）</option>
+              <option value="v60-01">Hario V60 01</option>
+              <option value="v60-02">Hario V60 02</option>
+              <option value="hario-switch">Hario Switch</option>
+              <option value="origami">Origami</option>
+              <option value="origami-air-s">Origami Air S</option>
+            </optgroup>
+            <optgroup label="平底 Flat">
+              <option value="kalita-155">Kalita Wave 155</option>
+              <option value="kalita-185">Kalita Wave 185</option>
+              <option value="kalita-101">Kalita 101</option>
+              <option value="kalita-102">Kalita 102</option>
+              <option value="orea-v3">Orea V3</option>
+              <option value="orea-v4-narrow">Orea V4 Narrow</option>
+              <option value="april">April Brewer</option>
+              <option value="stagg-x">Fellow Stagg X</option>
+            </optgroup>
+            <optgroup label="浸泡／特殊">
+              <option value="ufo-v3">UFO V3</option>
+              <option value="clever">Clever Dripper</option>
+              <option value="solo">SOLO Dripper（2025 WBrC）</option>
+              <option value="pulsar">Fellow Pulsar</option>
+            </optgroup>
+          </select>
+        </div>
+
+        <div class="field-row" id="switchModeRow">
+          <label for="switchMode">Switch 模式</label>
+          <select id="switchMode">
+            <option value="full-flow">全開流下</option>
+            <option value="immersion-then-open" selected>浸泡後開閥</option>
+            <option value="hybrid">混合（浸泡＋流下）</option>
+          </select>
+        </div>
+
+        <div class="field-row" id="immersionHoldRow">
+          <label for="immersionHold">浸泡時間 (秒) <span id="immersionHoldValue">90</span></label>
+          <input type="range" id="immersionHold" min="30" max="180" step="5" value="90" />
+        </div>
+
+        <div class="field-row">
+          <label for="filter">濾紙 <small class="hint-inline">（跟濾杯建議，可手動改）</small></label>
+          <select id="filter"></select>
+          <p class="field-hint" id="filterHint">跟住濾杯篩選常用紙；仍可選其他。</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ③ 豆資訊 -->
+    <section class="card collapsible open" data-section="bean" aria-labelledby="sec-bean">
+      <button type="button" class="collapse-toggle" aria-expanded="true" id="sec-bean">
+        <svg class="h2-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <ellipse cx="12" cy="12" rx="5" ry="7" stroke="currentColor" stroke-width="1.5" transform="rotate(-20 12 12)"/>
+        </svg>
+        <span>豆資訊</span>
+        <span class="chevron" aria-hidden="true">▾</span>
+      </button>
+      <div class="collapse-body">
+        <div class="field-row">
+          <label>快捷預設</label>
+          <div class="chip-row" id="beanQuickPresets"></div>
+        </div>
+
+        <div class="field-row">
+          <label for="origin">產地</label>
+          <select id="origin"></select>
+        </div>
+
+        <div class="field-row">
+          <label for="variety">品種</label>
+          <input type="search" id="varietySearch" placeholder="搜尋品種…" autocomplete="off" />
+          <select id="variety" size="1"></select>
+        </div>
+
+        <div class="field-row">
+          <label for="process">處理法</label>
+          <select id="process"></select>
+        </div>
+
+        <div class="field-row">
+          <label>風味（可多選）</label>
+          <div class="chip-row wrap" id="flavorChips"></div>
+          <select id="flavorSelect" multiple size="4" class="multi-select" aria-label="風味多選"></select>
+        </div>
+
+        <div class="field-row">
+          <label for="density">密度／硬度</label>
+          <select id="density">
+            <option value="soft">軟豆</option>
+            <option value="medium" selected>中等</option>
+            <option value="hard">硬豆</option>
+          </select>
+        </div>
+
+        <div class="field-row">
+          <label>味道特性（可多選）</label>
+          <div class="chip-row wrap" id="tendencyChips"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ④ 參數 -->
+    <section class="card collapsible open" data-section="params" aria-labelledby="sec-params">
+      <button type="button" class="collapse-toggle" aria-expanded="true" id="sec-params">
+        <svg class="h2-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <circle cx="12" cy="12" r="7" stroke="currentColor" stroke-width="1.6"/>
+          <path d="M9 13c1 2 5 2 6 0" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+          <path d="M10 10h.01M14 10h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+        <span>參數</span>
+        <span class="chevron" aria-hidden="true">▾</span>
+      </button>
+      <div class="collapse-body">
+        <div class="field-row">
+          <label for="dose">粉量 (g)</label>
+          <input type="number" id="dose" min="1" max="80" step="0.5" value="15" inputmode="decimal" />
+        </div>
+
+        <div class="field-row ratio-lock-row">
+          <label for="water">水量 (g)</label>
+          <div class="water-controls">
+            <input type="number" id="water" min="15" max="1000" step="1" value="250" inputmode="decimal" />
+            <button type="button" id="lockRatio" class="chip active" aria-pressed="true" title="鎖定比例">
+              🔒 鎖比例
+            </button>
+          </div>
+        </div>
+
+        <div class="field-row">
+          <label>目前比例</label>
+          <div class="ratio-display" id="ratioDisplay">1 : 16.67</div>
+        </div>
+
+        <div class="field-row">
+          <label for="grinder">磨豆機</label>
+          <select id="grinder">
+            <option value="s3" selected>Timemore S3 (0–9)</option>
+            <option value="ode">Fellow Ode Gen2 (1–11)</option>
+          </select>
+        </div>
+
+        <div class="field-row">
+          <label for="grind">研磨度 <span id="grindValue">4.9</span></label>
+          <input type="range" id="grind" min="0" max="9" step="0.1" value="4.9" />
+        </div>
+
+        <div class="field-row" id="tempRow">
+          <label for="temp">水溫 (°C) <span id="tempValue">93</span></label>
+          <input type="range" id="temp" min="80" max="98" step="1" value="93" />
+        </div>
+
+        <div class="actions">
+          <button type="button" id="resetBtn" class="btn-secondary">重設為基準</button>
+        </div>
+      </div>
+    </section>
+
+    <div class="bean-divider" aria-hidden="true">
+      <svg viewBox="0 0 120 28" fill="none">
+        <ellipse cx="60" cy="14" rx="9" ry="12" stroke="currentColor" stroke-width="1.4" transform="rotate(-25 60 14)"/>
+        <path d="M54 8 Q60 14 66 20" stroke="currentColor" stroke-width="1.2" fill="none" opacity="0.7"/>
+        <path d="M8 14 H42" stroke="currentColor" stroke-width="1" opacity="0.35" stroke-dasharray="3 4"/>
+        <path d="M78 14 H112" stroke="currentColor" stroke-width="1" opacity="0.35" stroke-dasharray="3 4"/>
+      </svg>
+    </div>
+
+    <!-- 做法教學 -->
+    <section class="card teaching-card hidden" id="teachingCard" aria-labelledby="teaching-title">
+      <h2 id="teaching-title">
+        <svg class="h2-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M4 5h16v14H4z" stroke="currentColor" stroke-width="1.5"/>
+          <path d="M8 9h8M8 13h6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+        做法教學
+      </h2>
+      <p class="teaching-recipe-name" id="teachingName"></p>
+      <p class="teaching-meta" id="teachingMeta"></p>
+      <ol class="teaching-steps" id="teachingSteps"></ol>
+      <ol class="teaching-notes" id="teachingNotes"></ol>
+    </section>
+
+    <!-- Outputs -->
+    <section class="card outputs" aria-labelledby="outputs-title">
+      <h2 id="outputs-title">
+        <svg class="h2-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M5 19 L12 5 L19 19 Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+          <path d="M12 19 V14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          <circle cx="12" cy="21" r="1.2" fill="currentColor"/>
+        </svg>
+        建議輸出
+      </h2>
+
+      <div class="stat-grid">
+        <div class="stat">
+          <span class="stat-label">比例</span>
+          <span class="stat-value" id="outRatio">1:16.67</span>
+        </div>
+        <div class="stat">
+          <span class="stat-label">總時間</span>
+          <span class="stat-value" id="outTime">2:30–3:00</span>
+        </div>
+        <div class="stat">
+          <span class="stat-label">建議研磨</span>
+          <span class="stat-value" id="outGrind">S3 4.9</span>
+        </div>
+        <div class="stat iced-stat hidden" id="icedStat">
+          <span class="stat-label">熱水 / 冰</span>
+          <span class="stat-value" id="outIced">—</span>
+        </div>
+      </div>
+
+      <div class="tip-box" id="tipBox">
+        <strong>小貼士</strong>
+        <p id="tipText">基準配方：肯尼亞水洗 · V60 · 15g / 250g · S3 4.9 · 93°C。</p>
+      </div>
+
+      <div class="brew-timer" id="brewTimer" aria-labelledby="timer-heading">
+        <div class="brew-timer-header">
+          <h3 class="timer-heading" id="timer-heading">
+            <svg class="h3-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <circle cx="12" cy="12" r="8.5" stroke="currentColor" stroke-width="1.6"/>
+              <path d="M12 8 V12 L15 14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            沖煮計時
+          </h3>
+          <button type="button" class="timer-start-btn" id="timerStartBtn">開始沖煮</button>
+        </div>
+        <p class="timer-cold-hint hidden" id="timerColdHint">冷萃以小時計，唔適合即時注水計時。</p>
+        <div class="timer-panel hidden" id="timerPanel">
+          <div class="timer-clock-wrap">
+            <div class="timer-clock" id="timerClock" aria-live="polite">0:00</div>
+            <div class="timer-status" id="timerStatus">準備中</div>
+          </div>
+          <p class="timer-step-label" id="timerStepLabel">按「開始沖煮」跟住時間表</p>
+          <div class="timer-overall" aria-hidden="true">
+            <div class="timer-overall-track">
+              <div class="timer-overall-fill" id="timerOverallFill"></div>
+            </div>
+            <span class="timer-overall-pct" id="timerOverallPct">0%</span>
+          </div>
+          <div class="timer-segments" id="timerSegments" role="list" aria-label="分段進度"></div>
+          <div class="timer-controls">
+            <button type="button" class="timer-btn timer-btn-pause" id="timerPauseBtn">暫停</button>
+            <button type="button" class="timer-btn timer-btn-resume hidden" id="timerResumeBtn">繼續</button>
+            <button type="button" class="timer-btn timer-btn-reset" id="timerResetBtn">重設</button>
+          </div>
+        </div>
+      </div>
+
+      <h3 class="schedule-title">
+        <svg class="h3-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M4 6 H20" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" opacity="0.5"/>
+          <path d="M6 12 H18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+          <path d="M8 18 H16" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" opacity="0.5"/>
+          <circle cx="10" cy="12" r="2" fill="currentColor"/>
+        </svg>
+        注水時間表
+      </h3>
+
+      <div class="pour-visual" id="pourVisual" aria-hidden="true">
+        <div class="pour-visual-label">累計注水</div>
+        <div class="pour-bars" id="pourBars"></div>
+        <div class="pour-kettle" aria-hidden="true">
+          <svg viewBox="0 0 48 40" fill="none">
+            <path d="M8 14 H30 V30 C30 34 26 36 19 36 C12 36 8 34 8 30 V14 Z" stroke="currentColor" stroke-width="1.6"/>
+            <path d="M30 18 H38 C41 18 42 22 40 25 L34 28" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+            <path d="M14 8 C16 4 22 4 24 8" stroke="currentColor" stroke-width="1.3" opacity="0.55"/>
+            <path d="M34 28 Q36 34 32 38" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" class="pour-stream"/>
+          </svg>
+        </div>
+      </div>
+
+      <ol class="schedule" id="schedule" aria-live="polite"></ol>
+    </section>
+  </main>
+
+
+  <div class="timer-sticky" id="timerSticky" hidden>
+    <div class="timer-sticky-inner">
+      <span class="timer-sticky-clock" id="timerStickyClock">0:00</span>
+      <span class="timer-sticky-label" id="timerStickyLabel">準備開始</span>
+      <button type="button" class="timer-sticky-btn" id="timerStickyBtn">開始</button>
+    </div>
+  </div>
+
+  <footer class="app-footer">
+    <svg class="footer-beans" viewBox="0 0 80 20" fill="none" aria-hidden="true">
+      <ellipse cx="20" cy="10" rx="5" ry="7" stroke="currentColor" stroke-width="1" transform="rotate(-20 20 10)" opacity="0.45"/>
+      <ellipse cx="40" cy="10" rx="5" ry="7" stroke="currentColor" stroke-width="1" transform="rotate(15 40 10)" opacity="0.55"/>
+      <ellipse cx="60" cy="10" rx="5" ry="7" stroke="currentColor" stroke-width="1" transform="rotate(-10 60 10)" opacity="0.45"/>
+    </svg>
+    <p>離線可用 · 設定會存入本機 · brew-simulator-v2</p>
+  </footer>
+
+  <script src="data-beans.js"></script>
+  <script src="data-recipes.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
