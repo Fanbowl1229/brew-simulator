@@ -18,7 +18,7 @@ python3 -m http.server 3001
 1. **濾杯**：V60 01/02、UFO V3、Kalita Wave 155/185、101/102、Origami／Air S、Hario Switch、Orea V3／V4 Narrow、April、Clever、SOLO、Stagg X、Pulsar 等；以 `<optgroup>` 分組。
 2. **濾紙**：Hario／Kalita／Cafec／Sibarist／April／Origami／Melitta／Chemex／Clever 等；跟濾杯軟篩選，可手動覆寫。
 3. **Hario Switch**：全開流下／浸泡後開閥／混合；顯示浸泡時間；時間表標示開關閥。
-4. **豆資訊**：產地、品種（可搜尋）、處理法、風味多選、**密度／硬度**（軟／中／硬）、**味道特性**多選；快捷預設（肯尼亞水洗、阿里山瑰夏日曬、清萊雙厭氧、Purple Perfume）會填欄位並影響水溫／研磨啟發式。
+4. **豆資訊（用家記錄）**：填寫豆名／產地／品種／處理法／風味／密度／味道特性／烘焙日期／筆記，撳「儲存呢隻豆」寫入本機；「我嘅豆」列表可載入、更新、刪除。可選「範本」預填欄位；支援匯出／匯入 JSON。載入後會套用同款水溫／研磨啟發式。
 5. **沖法**：手沖／濾泡／冷萃／冰咖啡；冷萃顯示浸泡小時、粗研磨、唔同時間表。
 6. **經典／冠軍配方**：WBrC 2023–2025、Kasuya 4:6、Hoffmann、Rao、Kurasu、Switch、Clever、Wave、UFO、日式冰手沖、冷萃、GLITCH、LEAVES TOKYO 等；選中會填參數並顯示「做法教學」卡。
 
@@ -63,6 +63,8 @@ brew-simulator/
 ```
 
 設定存於 `localStorage` 鍵 **`brew-simulator-v2`**（會嘗試從 v1 遷移基本欄位）。
+
+個人豆誌存於 **`brew-simulator-beans-v1`**（陣列：`{id, name, origin, variety, process, flavors[], density, tendencies[], roastDate?, notes?, savedAt}`）。
 
 ## 限制
 

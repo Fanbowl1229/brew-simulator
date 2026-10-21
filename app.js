@@ -6,6 +6,7 @@
   "use strict";
 
   const STORAGE_KEY = "brew-simulator-v2";
+  const BEANS_STORAGE_KEY = "brew-simulator-beans-v1";
   const BD = window.BREW_BEAN_DATA;
   const RD = window.BREW_RECIPES;
 
@@ -72,12 +73,16 @@
     coldSteepHours: 14,
     recipeId: "",
     bean: {
+      name: "",
       origins: ["肯亞"],
       varieties: ["SL28"],
       processes: ["肯亞式雙重水洗"],
       flavors: ["黑加侖子", "西柚"],
       density: "hard",
       tendencies: ["明亮酸質", "乾淨清爽"],
+      roastDate: "",
+      notes: "",
+      savedId: "",
       quickPreset: "kenya",
     },
   };
@@ -98,7 +103,9 @@
     "switchModeRow", "immersionHoldRow", "coldSteepRow", "coldSteepHours",
     "coldSteepValue", "pourStyleRow", "bloomRow", "icedToggleRow", "tempRow",
     "origin", "variety", "varietySearch", "process", "density", "flavorSelect",
-    "flavorChips", "tendencyChips", "beanQuickPresets", "teachingCard",
+    "flavorChips", "tendencyChips", "beanQuickPresets", "myBeansList", "myBeansEmpty",
+    "beanName", "roastDate", "beanNotes", "beanSaveBtn", "beanUpdateBtn", "beanDeleteBtn",
+    "beanSaveStatus", "beanExportBtn", "beanImportBtn", "beanImportFile", "teachingCard",
     "teachingName", "teachingMeta", "teachingSteps", "teachingNotes",
     "brewTimer", "timerStartBtn", "timerColdHint", "timerPanel", "timerClock",
     "timerStatus", "timerStepLabel", "timerOverallFill", "timerOverallPct",
@@ -108,6 +115,7 @@
 
   let state = JSON.parse(JSON.stringify(BASELINE));
   let filterOverride = false; // user manually picked filter
+  let myBeans = []; // personal bean journal (localStorage)
 
   // ——— Helpers ———
   function round1(n) { return Math.round(n * 10) / 10; }
@@ -567,12 +575,16 @@
     const p = BD.QUICK_PRESETS[key];
     if (!p) return;
     state.bean = {
+      name: state.bean.name || p.label || "",
       origins: p.origins.slice(),
       varieties: p.varieties.slice(),
       processes: p.processes.slice(),
       flavors: p.flavors.slice(),
       density: p.density,
       tendencies: p.tendencies.slice(),
+      roastDate: state.bean.roastDate || "",
+      notes: state.bean.notes || "",
+      savedId: "",
       quickPreset: key,
     };
     state.temp = p.temp;
@@ -580,10 +592,14 @@
     if (state.grinder === "s3") state.grind = sug;
     else state.grind = s3ToOde(sug);
     syncBeanControls();
+    setBeanSaveStatus("已套用範本「" + p.label + "」— 可改名後儲存");
     render();
   }
 
   function syncBeanControls() {
+    if (els.beanName) els.beanName.value = state.bean.name || "";
+    if (els.roastDate) els.roastDate.value = state.bean.roastDate || "";
+    if (els.beanNotes) els.beanNotes.value = state.bean.notes || "";
     fillSelect(els.origin, BD.ORIGINS, (state.bean.origins || [])[0]);
     fillVarietyOptions((state.bean.varieties || [])[0]);
     fillProcessSelect();
@@ -591,6 +607,274 @@
     els.density.value = state.bean.density || "medium";
     renderTendencyChips();
     renderQuickPresets();
+    renderMyBeans();
+    syncBeanActionButtons();
+  }
+
+  function uid() {
+    return "b" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  }
+
+  function loadMyBeans() {
+    try {
+      const raw = localStorage.getItem(BEANS_STORAGE_KEY);
+      if (!raw) {
+        myBeans = [];
+        return;
+      }
+      const data = JSON.parse(raw);
+      myBeans = Array.isArray(data) ? data.filter((b) => b && b.id && b.name) : [];
+    } catch (_) {
+      myBeans = [];
+    }
+  }
+
+  function persistMyBeans() {
+    try {
+      localStorage.setItem(BEANS_STORAGE_KEY, JSON.stringify(myBeans));
+    } catch (_) {}
+  }
+
+  function setBeanSaveStatus(msg) {
+    if (!els.beanSaveStatus) return;
+    els.beanSaveStatus.textContent = msg || "";
+  }
+
+  function syncBeanActionButtons() {
+    const has = !!(state.bean.savedId && myBeans.some((b) => b.id === state.bean.savedId));
+    if (els.beanUpdateBtn) els.beanUpdateBtn.disabled = !has;
+    if (els.beanDeleteBtn) els.beanDeleteBtn.disabled = !has;
+  }
+
+  function collectBeanForm() {
+    return {
+      name: (els.beanName && els.beanName.value || state.bean.name || "").trim(),
+      origins: state.bean.origins ? state.bean.origins.slice() : [],
+      varieties: state.bean.varieties ? state.bean.varieties.slice() : [],
+      processes: state.bean.processes ? state.bean.processes.slice() : [],
+      flavors: state.bean.flavors ? state.bean.flavors.slice() : [],
+      density: state.bean.density || "medium",
+      tendencies: state.bean.tendencies ? state.bean.tendencies.slice() : [],
+      roastDate: (els.roastDate && els.roastDate.value) || state.bean.roastDate || "",
+      notes: (els.beanNotes && els.beanNotes.value || state.bean.notes || "").trim(),
+    };
+  }
+
+  function applyBeanRecord(rec, opts) {
+    opts = opts || {};
+    state.bean = {
+      name: rec.name || "",
+      origins: (rec.origins || []).slice(),
+      varieties: (rec.varieties || []).slice(),
+      processes: (rec.processes || []).slice(),
+      flavors: (rec.flavors || []).slice(),
+      density: rec.density || "medium",
+      tendencies: (rec.tendencies || []).slice(),
+      roastDate: rec.roastDate || "",
+      notes: rec.notes || "",
+      savedId: opts.asSaved ? (rec.id || "") : "",
+      quickPreset: "",
+    };
+    if (opts.applyHeuristics !== false) {
+      const h = beanHeuristics();
+      state.temp = h.temp;
+      const sug = suggestedGrindS3(state.dose, state.iced);
+      if (state.grinder === "s3") state.grind = sug;
+      else state.grind = s3ToOde(sug);
+    }
+    syncBeanControls();
+    render();
+  }
+
+  function renderMyBeans() {
+    if (!els.myBeansList) return;
+    const empty = !myBeans.length;
+    if (els.myBeansEmpty) els.myBeansEmpty.classList.toggle("hidden", !empty);
+    if (empty) {
+      els.myBeansList.innerHTML = "";
+      return;
+    }
+    els.myBeansList.innerHTML = myBeans
+      .slice()
+      .sort((a, b) => String(b.savedAt || "").localeCompare(String(a.savedAt || "")))
+      .map((b) => {
+        const on = state.bean.savedId === b.id;
+        const label = b.name || "未命名";
+        return (
+          '<button type="button" class="chip my-bean-chip' +
+          (on ? " active" : "") +
+          '" data-bean-id="' +
+          b.id +
+          '" aria-pressed="' +
+          on +
+          '" title="' +
+          label +
+          '">' +
+          label +
+          "</button>"
+        );
+      })
+      .join("");
+  }
+
+  function saveCurrentBeanAsNew() {
+    const form = collectBeanForm();
+    if (!form.name) {
+      setBeanSaveStatus("請先填豆名／筆記名稱");
+      if (els.beanName) els.beanName.focus();
+      return;
+    }
+    const rec = {
+      id: uid(),
+      name: form.name,
+      origin: (form.origins || [])[0] || "",
+      origins: form.origins,
+      variety: (form.varieties || [])[0] || "",
+      varieties: form.varieties,
+      process: (form.processes || [])[0] || "",
+      processes: form.processes,
+      flavors: form.flavors,
+      density: form.density,
+      tendencies: form.tendencies,
+      roastDate: form.roastDate || undefined,
+      notes: form.notes || undefined,
+      savedAt: new Date().toISOString(),
+    };
+    myBeans.push(rec);
+    persistMyBeans();
+    state.bean.name = form.name;
+    state.bean.roastDate = form.roastDate;
+    state.bean.notes = form.notes;
+    state.bean.savedId = rec.id;
+    state.bean.quickPreset = "";
+    renderMyBeans();
+    syncBeanActionButtons();
+    setBeanSaveStatus("已儲存「" + rec.name + "」");
+    save();
+  }
+
+  function updateCurrentBean() {
+    const id = state.bean.savedId;
+    const idx = myBeans.findIndex((b) => b.id === id);
+    if (idx < 0) {
+      setBeanSaveStatus("未揀到已儲存嘅豆，請先儲存或撳「我嘅豆」");
+      return;
+    }
+    const form = collectBeanForm();
+    if (!form.name) {
+      setBeanSaveStatus("請先填豆名／筆記名稱");
+      if (els.beanName) els.beanName.focus();
+      return;
+    }
+    const prev = myBeans[idx];
+    myBeans[idx] = {
+      id: prev.id,
+      name: form.name,
+      origin: (form.origins || [])[0] || "",
+      origins: form.origins,
+      variety: (form.varieties || [])[0] || "",
+      varieties: form.varieties,
+      process: (form.processes || [])[0] || "",
+      processes: form.processes,
+      flavors: form.flavors,
+      density: form.density,
+      tendencies: form.tendencies,
+      roastDate: form.roastDate || undefined,
+      notes: form.notes || undefined,
+      savedAt: new Date().toISOString(),
+    };
+    persistMyBeans();
+    state.bean.name = form.name;
+    state.bean.roastDate = form.roastDate;
+    state.bean.notes = form.notes;
+    renderMyBeans();
+    syncBeanActionButtons();
+    setBeanSaveStatus("已更新「" + form.name + "」");
+    save();
+  }
+
+  function deleteCurrentBean() {
+    const id = state.bean.savedId;
+    const idx = myBeans.findIndex((b) => b.id === id);
+    if (idx < 0) return;
+    const name = myBeans[idx].name;
+    myBeans.splice(idx, 1);
+    persistMyBeans();
+    state.bean.savedId = "";
+    renderMyBeans();
+    syncBeanActionButtons();
+    setBeanSaveStatus("已刪除「" + name + "」");
+    save();
+  }
+
+  function exportMyBeans() {
+    const blob = new Blob([JSON.stringify(myBeans, null, 2)], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "brew-simulator-beans.json";
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => {
+      URL.revokeObjectURL(a.href);
+      a.remove();
+    }, 0);
+    setBeanSaveStatus("已匯出 " + myBeans.length + " 隻豆");
+  }
+
+  function importMyBeansFromFile(file) {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const data = JSON.parse(String(reader.result || "[]"));
+        if (!Array.isArray(data)) throw new Error("not array");
+        let added = 0;
+        data.forEach((raw) => {
+          if (!raw || typeof raw !== "object") return;
+          const name = String(raw.name || "").trim();
+          if (!name) return;
+          const origins = Array.isArray(raw.origins)
+            ? raw.origins
+            : raw.origin
+            ? [raw.origin]
+            : [];
+          const varieties = Array.isArray(raw.varieties)
+            ? raw.varieties
+            : raw.variety
+            ? [raw.variety]
+            : [];
+          const processes = Array.isArray(raw.processes)
+            ? raw.processes
+            : raw.process
+            ? [raw.process]
+            : [];
+          const rec = {
+            id: uid(),
+            name: name,
+            origin: origins[0] || "",
+            origins: origins,
+            variety: varieties[0] || "",
+            varieties: varieties,
+            process: processes[0] || "",
+            processes: processes,
+            flavors: Array.isArray(raw.flavors) ? raw.flavors : [],
+            density: raw.density || "medium",
+            tendencies: Array.isArray(raw.tendencies) ? raw.tendencies : [],
+            roastDate: raw.roastDate || undefined,
+            notes: raw.notes || undefined,
+            savedAt: raw.savedAt || new Date().toISOString(),
+          };
+          myBeans.push(rec);
+          added += 1;
+        });
+        persistMyBeans();
+        renderMyBeans();
+        setBeanSaveStatus("已匯入 " + added + " 隻豆");
+      } catch (_) {
+        setBeanSaveStatus("匯入失敗：請用匯出嘅 JSON");
+      }
+    };
+    reader.readAsText(file);
   }
 
   function fillVarietyOptions(selected, filterText) {
@@ -874,6 +1158,11 @@
       state = { ...JSON.parse(JSON.stringify(BASELINE)), ...data };
       if (!state.bean || !state.bean.origins) {
         state.bean = JSON.parse(JSON.stringify(BASELINE.bean));
+      } else {
+        state.bean.name = state.bean.name || "";
+        state.bean.roastDate = state.bean.roastDate || "";
+        state.bean.notes = state.bean.notes || "";
+        state.bean.savedId = state.bean.savedId || "";
       }
     } catch (_) {}
   }
@@ -1478,6 +1767,56 @@
     applyQuickPreset(btn.getAttribute("data-preset"));
   });
 
+  if (els.beanName) {
+    els.beanName.addEventListener("input", () => {
+      state.bean.name = els.beanName.value;
+      save();
+    });
+  }
+  if (els.roastDate) {
+    els.roastDate.addEventListener("change", () => {
+      state.bean.roastDate = els.roastDate.value;
+      save();
+    });
+  }
+  if (els.beanNotes) {
+    els.beanNotes.addEventListener("input", () => {
+      state.bean.notes = els.beanNotes.value;
+      save();
+    });
+  }
+  if (els.myBeansList) {
+    els.myBeansList.addEventListener("click", (e) => {
+      const btn = e.target.closest(".my-bean-chip");
+      if (!btn) return;
+      const id = btn.getAttribute("data-bean-id");
+      const rec = myBeans.find((b) => b.id === id);
+      if (!rec) return;
+      applyBeanRecord(rec, { asSaved: true, applyHeuristics: true });
+      setBeanSaveStatus("已載入「" + rec.name + "」");
+    });
+  }
+  if (els.beanSaveBtn) {
+    els.beanSaveBtn.addEventListener("click", () => saveCurrentBeanAsNew());
+  }
+  if (els.beanUpdateBtn) {
+    els.beanUpdateBtn.addEventListener("click", () => updateCurrentBean());
+  }
+  if (els.beanDeleteBtn) {
+    els.beanDeleteBtn.addEventListener("click", () => deleteCurrentBean());
+  }
+  if (els.beanExportBtn) {
+    els.beanExportBtn.addEventListener("click", () => exportMyBeans());
+  }
+  if (els.beanImportBtn && els.beanImportFile) {
+    els.beanImportBtn.addEventListener("click", () => els.beanImportFile.click());
+    els.beanImportFile.addEventListener("change", () => {
+      const f = els.beanImportFile.files && els.beanImportFile.files[0];
+      importMyBeansFromFile(f);
+      els.beanImportFile.value = "";
+    });
+  }
+
   els.resetBtn.addEventListener("click", () => {
     state = JSON.parse(JSON.stringify(BASELINE));
     filterOverride = false;
@@ -1500,6 +1839,7 @@
   // Init
   wireTimerControls();
   load();
+  loadMyBeans();
   if (state.lockRatio) {
     state.ratio = state.ratio || BASELINE.ratio;
     state.water = round0(state.dose * state.ratio);

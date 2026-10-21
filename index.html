@@ -172,8 +172,14 @@
       </button>
       <div class="collapse-body">
         <div class="field-row">
-          <label>快捷預設</label>
-          <div class="chip-row" id="beanQuickPresets"></div>
+          <label>我嘅豆 <small class="hint-inline">（撳一下載入）</small></label>
+          <div class="chip-row wrap" id="myBeansList"></div>
+          <p class="field-hint" id="myBeansEmpty">未有記錄，填完撳儲存</p>
+        </div>
+
+        <div class="field-row">
+          <label for="beanName">豆名／筆記名稱 <small class="hint-inline">（儲存必填）</small></label>
+          <input type="text" id="beanName" placeholder="例如：清萊 Srima 9月焙" maxlength="80" autocomplete="off" />
         </div>
 
         <div class="field-row">
@@ -210,6 +216,34 @@
         <div class="field-row">
           <label>味道特性（可多選）</label>
           <div class="chip-row wrap" id="tendencyChips"></div>
+        </div>
+
+        <div class="field-row">
+          <label for="roastDate">烘焙日期（可選）</label>
+          <input type="date" id="roastDate" />
+        </div>
+
+        <div class="field-row">
+          <label for="beanNotes">筆記（可選）</label>
+          <textarea id="beanNotes" rows="2" maxlength="400" placeholder="例如：清新花香、適合低溫溫和沖…"></textarea>
+        </div>
+
+        <div class="actions bean-actions">
+          <button type="button" id="beanSaveBtn" class="btn-primary">儲存呢隻豆</button>
+          <button type="button" id="beanUpdateBtn" class="btn-secondary" disabled>更新</button>
+          <button type="button" id="beanDeleteBtn" class="btn-danger" disabled>刪除</button>
+        </div>
+        <p class="field-hint" id="beanSaveStatus" aria-live="polite"></p>
+
+        <div class="actions bean-io">
+          <button type="button" id="beanExportBtn" class="btn-secondary">匯出</button>
+          <button type="button" id="beanImportBtn" class="btn-secondary">匯入</button>
+          <input type="file" id="beanImportFile" accept="application/json,.json" hidden />
+        </div>
+
+        <div class="field-row">
+          <label>範本 <small class="hint-inline">（可選・預填欄位）</small></label>
+          <div class="chip-row" id="beanQuickPresets"></div>
         </div>
       </div>
     </section>
