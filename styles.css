@@ -849,6 +849,23 @@ input[type="search"]:focus {
 .teaching-notes li {
   margin-bottom: 0.35rem;
 }
+.teaching-notes a,
+.teaching-link a {
+  color: var(--accent-dark);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.teaching-link {
+  margin: 0.75rem 0 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+#kasuya46ModeRow .field-hint {
+  margin: 0.35rem 0 0;
+  font-size: 0.75rem;
+  color: var(--muted);
+  line-height: 1.35;
+}
 
 select[multiple] {
   background-image: none;

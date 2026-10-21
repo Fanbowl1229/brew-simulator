@@ -25,7 +25,7 @@
       </svg>
       <div class="header-titles">
         <h1>手沖沖煮模擬器</h1>
-        <p class="subtitle">濾杯 · 豆資訊 · 經典配方 · 注水時間表</p>
+        <p class="subtitle">濾杯 · 豆資訊 · 4:6 法 · 經典配方 · 計時</p>
       </div>
       <svg class="icon-cup" viewBox="0 0 64 56" fill="none" xmlns="http://www.w3.org/2000/svg">
         <path d="M12 16 H44 V36 C44 42 38 46 28 46 C18 46 12 42 12 36 V16 Z" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/>
@@ -75,11 +75,22 @@
           <label for="pourStyle">注水風格</label>
           <select id="pourStyle">
             <option value="3pour" selected>三段式（3 pour）</option>
+            <option value="kasuya46">4:6 法（粕谷哲）</option>
             <option value="4equal">四段等量</option>
             <option value="5equal">五段等量</option>
             <option value="ufo-official">UFO 官方風格</option>
             <option value="bloom3">悶蒸 + 三段</option>
           </select>
+        </div>
+
+        <div class="field-row hidden" id="kasuya46ModeRow">
+          <label for="kasuya46Mode">4:6 調性</label>
+          <select id="kasuya46Mode">
+            <option value="bright">清爽果酸型（前段拆細）</option>
+            <option value="balanced" selected>平衡風味型（標準）</option>
+            <option value="full">濃郁厚實型（後段拆細）</option>
+          </select>
+          <p class="field-hint">前 40% 定風味方向；後 60% 定濃淡／厚度。累積水量為準，時間係節奏參考。</p>
         </div>
 
         <div class="field-row" id="bloomRow">
@@ -326,6 +337,7 @@
       <p class="teaching-meta" id="teachingMeta"></p>
       <ol class="teaching-steps" id="teachingSteps"></ol>
       <ol class="teaching-notes" id="teachingNotes"></ol>
+      <p class="teaching-link hidden" id="teachingLink"></p>
     </section>
 
     <!-- Outputs -->

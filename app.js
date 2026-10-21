@@ -64,6 +64,7 @@
     brewer: "v60",
     filter: "hario-v60-02-bleached",
     pourStyle: "3pour",
+    kasuya46Mode: "balanced",
     bloomWait: 45,
     iced: false,
     lockRatio: true,
@@ -101,12 +102,12 @@
     "icedStat", "outIced", "tipText", "schedule", "pourBars", "brewStyle",
     "recipePick", "switchMode", "immersionHold", "immersionHoldValue",
     "switchModeRow", "immersionHoldRow", "coldSteepRow", "coldSteepHours",
-    "coldSteepValue", "pourStyleRow", "bloomRow", "icedToggleRow", "tempRow",
+    "coldSteepValue", "pourStyleRow", "kasuya46ModeRow", "kasuya46Mode", "bloomRow", "icedToggleRow", "tempRow",
     "origin", "variety", "varietySearch", "process", "density", "flavorSelect",
     "flavorChips", "tendencyChips", "beanQuickPresets", "myBeansList", "myBeansEmpty",
     "beanName", "roastDate", "beanNotes", "beanSaveBtn", "beanUpdateBtn", "beanDeleteBtn",
     "beanSaveStatus", "beanExportBtn", "beanImportBtn", "beanImportFile", "teachingCard",
-    "teachingName", "teachingMeta", "teachingSteps", "teachingNotes",
+    "teachingName", "teachingMeta", "teachingSteps", "teachingNotes", "teachingLink",
     "brewTimer", "timerStartBtn", "timerColdHint", "timerPanel", "timerClock",
     "timerStatus", "timerStepLabel", "timerOverallFill", "timerOverallPct",
     "timerSegments", "timerPauseBtn", "timerResumeBtn", "timerResetBtn",
@@ -118,6 +119,127 @@
   let myBeans = []; // personal bean journal (localStorage)
 
   // ——— Helpers ———
+  /** Kasuya 4:6 baselines @ 20g / 300ml — scale pours by waterHot/300; times = rhythm only */
+  const KASUYA46_BASE_WATER = 300;
+  const KASUYA46_MODES = {
+    bright: {
+      id: "bright",
+      label: "清爽果酸型",
+      shortLabel: "清爽果酸",
+      desc: "前段拆細 → 香氣更立體、果酸更明亮",
+      pours: [40, 40, 40, 90, 90],
+      times: [0, 45, 75, 105, 150],
+      bloomSec: 45,
+      dripLo: 210,
+      dripHi: 240,
+      notes: [
+        "第 1 注（悶蒸）",
+        "第 2 注 · 目標約 30 秒內注完",
+        "第 3 注 · 完成前段 40%",
+        "第 4 注 · 後段 60%（1）",
+        "第 5 注 · 後段 60%（2）· 滴完約 3:30–4:00",
+      ],
+    },
+    balanced: {
+      id: "balanced",
+      label: "平衡風味型",
+      shortLabel: "平衡風味",
+      desc: "標準分法 · 最適合作基準對比",
+      pours: [60, 60, 60, 60, 60],
+      times: [0, 45, 90, 135, 180],
+      bloomSec: 45,
+      dripLo: 240,
+      dripHi: 300,
+      notes: [
+        "第 1 注（悶蒸）",
+        "第 2 注 · 完成前段 40%",
+        "第 3 注 · 後段開始",
+        "第 4 注 · 後段",
+        "第 5 注 · 收尾 · 滴完約 4:00–5:00",
+      ],
+    },
+    full: {
+      id: "full",
+      label: "濃郁厚實型",
+      shortLabel: "濃郁厚實",
+      desc: "前段集中、後段拆細 → 甜感集中、Body 更厚",
+      pours: [120, 45, 45, 45, 45],
+      times: [0, 60, 90, 120, 150],
+      bloomSec: 60,
+      dripLo: 240,
+      dripHi: 300,
+      notes: [
+        "第 1 注（悶蒸）· 前段一次集中",
+        "第 2 注 · 後段拆細開始",
+        "第 3 注 · 維持穩定流速",
+        "第 4 注 · 避免外圈沖刷",
+        "第 5 注 · 收尾 · 滴完約 4:00–5:00",
+      ],
+    },
+  };
+
+  function getKasuya46Mode() {
+    const m = state.kasuya46Mode;
+    return KASUYA46_MODES[m] || KASUYA46_MODES.balanced;
+  }
+
+  function isKasuya46Active() {
+    return state.pourStyle === "kasuya46" || state.recipeId === "kasuya-46";
+  }
+
+  function scaleKasuya46Pours(waterHot, mode) {
+    const base = mode.pours;
+    const n = base.length;
+    if (!waterHot || waterHot <= 0) return base.map(() => 0);
+    const scale = waterHot / KASUYA46_BASE_WATER;
+    const rounded = [];
+    let cum = 0;
+    for (let i = 0; i < n - 1; i++) {
+      let g = round0(base[i] * scale);
+      rounded.push(g);
+      cum += g;
+    }
+    let last = waterHot - cum;
+    if (last < 0) {
+      // rounding overflow — peel from earlier pours
+      let deficit = -last;
+      last = 0;
+      for (let i = n - 2; i >= 0 && deficit > 0; i--) {
+        const take = Math.min(rounded[i], deficit);
+        rounded[i] -= take;
+        deficit -= take;
+      }
+    }
+    rounded.push(last);
+    return rounded;
+  }
+
+  function buildKasuya46Schedule(waterHot) {
+    const mode = getKasuya46Mode();
+    const pours = scaleKasuya46Pours(waterHot, mode);
+    const steps = [];
+    let cum = 0;
+    for (let i = 0; i < pours.length; i++) {
+      cum += pours[i];
+      const isBloom = i === 0;
+      steps.push({
+        label: isBloom ? "悶蒸／第 1 注" : "第 " + (i + 1) + " 注",
+        atSec: mode.times[i],
+        pourG: pours[i],
+        cumulativeG: cum,
+        note: mode.notes[i] + " · 目標累計 " + cum + "g",
+      });
+    }
+    return steps;
+  }
+
+  function fmtTimeSec(sec) {
+    const s = Math.max(0, Math.round(sec));
+    const m = Math.floor(s / 60);
+    const r = s % 60;
+    return m + ":" + String(r).padStart(2, "0");
+  }
+
   function round1(n) { return Math.round(n * 10) / 10; }
   function round0(n) { return Math.round(n); }
   function fmtRatioClean(r) {
@@ -235,6 +357,11 @@
       return steps;
     }
 
+    // Kasuya 4:6 — cumulative water is truth; times are rhythm only
+    if (style === "kasuya46") {
+      return buildKasuya46Schedule(waterHot);
+    }
+
     if (style === "ufo-official" || (style === "3pour" && isUfo(brewer))) {
       bloomG = round0(Math.min(waterHot * 0.2, dose * 3));
       const mid = round0((waterHot - bloomG) * 0.45);
@@ -350,6 +477,10 @@
       const h = state.coldSteepHours || 14;
       return { lo: h * 3600, hi: (h + 2) * 3600, cold: true };
     }
+    if (state.pourStyle === "kasuya46") {
+      const mode = getKasuya46Mode();
+      return { lo: mode.dripLo, hi: mode.dripHi };
+    }
     const lastPourAt = steps.length ? steps[steps.length - 1].atSec : 45;
     let drain = 45;
     if (dose < 12) drain = 30;
@@ -369,7 +500,13 @@
     const h = beanHeuristics();
     if (h.tip) parts.push(h.tip);
 
-    if (state.dose < 12) {
+    if (state.pourStyle === "kasuya46") {
+      const mode = getKasuya46Mode();
+      parts.push(
+        "4:6「" + mode.label + "」：" + mode.desc +
+        "。累積水量係真理；時間只係節奏。基準表 20g/300ml，而家按你嘅粉水自動縮放。"
+      );
+    } else if (state.dose < 12) {
       parts.push("粉量細過 12g，建議研磨再細少少，注水間隔縮短啲。");
     } else if (state.dose > 18) {
       parts.push("粉量大過 18g，研磨可略粗或維持，總時間會長啲。");
@@ -926,7 +1063,13 @@
     state.filter = r.filter;
     filterOverride = true;
     if (r.pourStyle) state.pourStyle = r.pourStyle;
-    if (r.bloomWait != null) state.bloomWait = r.bloomWait;
+    if (r.kasuya46Mode) state.kasuya46Mode = r.kasuya46Mode;
+    if (r.pourStyle === "kasuya46") {
+      state.kasuya46Mode = r.kasuya46Mode || state.kasuya46Mode || "balanced";
+      state.bloomWait = getKasuya46Mode().bloomSec;
+    } else if (r.bloomWait != null) {
+      state.bloomWait = r.bloomWait;
+    }
     if (r.brewStyle) state.brewStyle = r.brewStyle;
     if (r.switchMode) state.switchMode = r.switchMode;
     if (r.immersionHold != null) state.immersionHold = r.immersionHold;
@@ -942,17 +1085,58 @@
     render();
   }
 
-  function showTeaching(r) {
-    els.teachingCard.classList.remove("hidden");
-    els.teachingName.textContent = r.name;
-    els.teachingMeta.textContent =
-      r.dose + "g / " + r.water + "g · " + r.temp + "°C · " +
-      (BREWER_META[r.brewer] || {}).label + " · " +
-      (FILTERS.find((f) => f.id === r.filter) || {}).label +
-      (r.grindHint ? " · 研磨：" + r.grindHint : "") +
-      (r.totalTime ? " · " + r.totalTime : "");
+  function buildKasuya46TeachingSteps(waterHot) {
+    const mode = getKasuya46Mode();
+    const pours = scaleKasuya46Pours(waterHot, mode);
+    let cum = 0;
+    return pours.map((add, i) => {
+      cum += add;
+      const t = mode.times[i];
+      const mm = Math.floor(t / 60);
+      const ss = String(t % 60).padStart(2, "0");
+      return {
+        time: mm + ":" + ss,
+        add: add,
+        total: cum,
+        instruction: mode.notes[i],
+      };
+    });
+  }
 
-    els.teachingSteps.innerHTML = (r.steps || [])
+  function showTeaching(r) {
+    if (!r) {
+      els.teachingCard.classList.add("hidden");
+      if (els.teachingLink) {
+        els.teachingLink.classList.add("hidden");
+        els.teachingLink.innerHTML = "";
+      }
+      return;
+    }
+    els.teachingCard.classList.remove("hidden");
+    const mode = r.pourStyle === "kasuya46" ? getKasuya46Mode() : null;
+    const dose = Number(state.dose) || r.dose;
+    const water = state.lockRatio
+      ? round0(dose * state.ratio)
+      : Number(state.water) || r.water;
+    const nameExtra = mode ? " · " + mode.label : "";
+    els.teachingName.textContent = r.name + nameExtra;
+    const drip =
+      mode
+        ? "滴完約 " + fmtTimeSec(mode.dripLo) + "–" + fmtTimeSec(mode.dripHi)
+        : r.totalTime || "";
+    els.teachingMeta.textContent =
+      dose + "g / " + water + "g · " + state.temp + "°C · " +
+      (BREWER_META[state.brewer] || BREWER_META[r.brewer] || {}).label + " · " +
+      (FILTERS.find((f) => f.id === (state.filter || r.filter)) || {}).label +
+      (r.grindHint ? " · 研磨：" + r.grindHint : "") +
+      (drip ? " · " + drip : "") +
+      (mode ? " · 基準 20g/300ml 線性縮放" : "");
+
+    let steps = r.steps || [];
+    if (r.pourStyle === "kasuya46") {
+      steps = buildKasuya46TeachingSteps(water);
+    }
+    els.teachingSteps.innerHTML = steps
       .map(
         (s) =>
           "<li><strong>" +
@@ -967,6 +1151,26 @@
     els.teachingNotes.innerHTML = (r.teaching || [])
       .map((t, i) => "<li>" + (i + 1) + ". " + t + "</li>")
       .join("");
+
+    if (els.teachingLink) {
+      if (r.pourStyle === "kasuya46") {
+        els.teachingLink.classList.remove("hidden");
+        els.teachingLink.innerHTML =
+          '參考：<a href="https://www.matrix.com.tw/46-method-advanced-guide-coffee-beans-parameters" target="_blank" rel="noopener">Matrix 粕谷哲 4:6 法進階攻略</a>';
+      } else {
+        els.teachingLink.classList.add("hidden");
+        els.teachingLink.innerHTML = "";
+      }
+    }
+  }
+
+  function refreshTeachingIfNeeded() {
+    if (!state.recipeId) return;
+    const r = RD.RECIPES.find((x) => x.id === state.recipeId);
+    if (!r) return;
+    if (r.pourStyle === "kasuya46" || state.pourStyle === "kasuya46") {
+      showTeaching(r);
+    }
   }
 
   function updateStyleVisibility() {
@@ -980,7 +1184,13 @@
       (style === "immersion" && (BREWER_META[state.brewer] || {}).isImmersion);
 
     els.pourStyleRow.classList.toggle("hidden", !showPour && style !== "immersion");
-    els.bloomRow.classList.toggle("hidden", !showBloom || showCold || (showSwitch && state.switchMode === "immersion-then-open"));
+    if (els.kasuya46ModeRow) {
+      const show46 = showPour && state.pourStyle === "kasuya46";
+      els.kasuya46ModeRow.classList.toggle("hidden", !show46);
+    }
+    // 4:6 用模式自帶悶蒸節拍，隱藏通用悶蒸滑桿避免打架
+    const hideBloomFor46 = state.pourStyle === "kasuya46";
+    els.bloomRow.classList.toggle("hidden", !showBloom || showCold || hideBloomFor46 || (showSwitch && state.switchMode === "immersion-then-open"));
     els.coldSteepRow.classList.toggle("hidden", !showCold);
     els.icedToggleRow.classList.toggle("hidden", style === "cold" || style === "iced");
     els.tempRow.classList.toggle("hidden", showCold);
@@ -1053,6 +1263,10 @@
       els.filter.value = state.filter;
     }
     els.pourStyle.value = state.pourStyle;
+    if (els.kasuya46Mode) els.kasuya46Mode.value = state.kasuya46Mode || "balanced";
+    if (state.pourStyle === "kasuya46") {
+      state.bloomWait = getKasuya46Mode().bloomSec;
+    }
     els.bloomWait.value = state.bloomWait;
     els.bloomWaitValue.textContent = state.bloomWait;
     els.brewStyle.value = state.brewStyle;
@@ -1123,6 +1337,8 @@
       const elapsedSec = Math.min(timer.totalSec || 0, timerElapsedMs() / 1000);
       applyScheduleHighlights(findStepIndex(elapsedSec, timer.steps), elapsedSec);
     }
+
+    refreshTeachingIfNeeded();
 
     save();
   }
@@ -1606,8 +1822,35 @@
 
   els.pourStyle.addEventListener("change", () => {
     state.pourStyle = els.pourStyle.value;
+    if (state.pourStyle === "kasuya46") {
+      state.bloomWait = getKasuya46Mode().bloomSec;
+      // 跟住教學卡：若未揀配方就套用粕谷哲 4:6
+      if (!state.recipeId || state.recipeId === "kasuya-46") {
+        const r = RD.RECIPES.find((x) => x.id === "kasuya-46");
+        if (r) {
+          state.recipeId = "kasuya-46";
+          if (els.recipePick) els.recipePick.value = "kasuya-46";
+          showTeaching(r);
+        }
+      }
+    }
     render();
   });
+
+  if (els.kasuya46Mode) {
+    els.kasuya46Mode.addEventListener("change", () => {
+      state.kasuya46Mode = els.kasuya46Mode.value;
+      state.pourStyle = "kasuya46";
+      state.bloomWait = getKasuya46Mode().bloomSec;
+      if (!state.recipeId) {
+        state.recipeId = "kasuya-46";
+        if (els.recipePick) els.recipePick.value = "kasuya-46";
+      }
+      const r = RD.RECIPES.find((x) => x.id === "kasuya-46");
+      if (r) showTeaching(r);
+      render();
+    });
+  }
 
   els.bloomWait.addEventListener("input", () => {
     state.bloomWait = Number(els.bloomWait.value);
@@ -1840,6 +2083,14 @@
   wireTimerControls();
   load();
   loadMyBeans();
+  // migrate legacy single Kasuya 4:6 (旧 4equal) → new mode-aware style
+  if (!state.kasuya46Mode) state.kasuya46Mode = "balanced";
+  if (state.recipeId === "kasuya-46" && state.pourStyle !== "kasuya46") {
+    state.pourStyle = "kasuya46";
+  }
+  if (state.pourStyle === "kasuya46") {
+    state.bloomWait = getKasuya46Mode().bloomSec;
+  }
   if (state.lockRatio) {
     state.ratio = state.ratio || BASELINE.ratio;
     state.water = round0(state.dose * state.ratio);
