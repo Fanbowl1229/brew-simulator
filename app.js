@@ -256,6 +256,10 @@
   function isUfo(b) { return b === "ufo-v3" || b === "ufo"; }
   function isKalita(b) { return String(b).indexOf("kalita") === 0; }
   function isSwitch(b) { return b === "hario-switch"; }
+  /** Valve schedule / Switch UI: native Switch, or Resistance mode (UFO V3 on Switch base). */
+  function usesValveControls(b) {
+    return isSwitch(b) || state.switchMode === "resistance";
+  }
 
   function beanHeuristics() {
     return BD.heuristicsFromBean(state.bean);
@@ -272,7 +276,7 @@
     }
     if (iced || state.brewStyle === "iced") g -= 0.3;
     if (state.brewStyle === "cold") g += 1.2; // much coarser
-    if (state.brewStyle === "immersion" || isSwitch(state.brewer) && state.switchMode !== "full-flow") {
+    if (state.brewStyle === "immersion" || usesValveControls(state.brewer) && state.switchMode !== "full-flow") {
       g += 0.25;
     }
     return clamp(round1(g), 0, 9);
@@ -310,9 +314,38 @@
       return steps;
     }
 
-    // Switch immersion modes
-    if (isSwitch(brewer) && state.switchMode !== "full-flow") {
+    // Switch / valve modes (Hario Switch, or UFO V3 + Switch「阻力 Resistance」)
+    if (usesValveControls(brewer) && state.switchMode !== "full-flow") {
       const hold = state.immersionHold || 90;
+      // Resistance：開閥滲濾 → 關閥浸泡 → 開閥放流（Nas Jaafar）
+      if (state.switchMode === "resistance") {
+        const half = round0(waterHot / 2);
+        const rest = waterHot - half;
+        const closeAt = bloomWait != null ? bloomWait : 58;
+        const openAt = closeAt + hold;
+        steps.push({
+          label: "開閥滲濾",
+          atSec: 0,
+          pourG: half,
+          cumulativeG: half,
+          note: "閥門開啟 · 滲濾注水",
+        });
+        steps.push({
+          label: "關閥浸泡",
+          atSec: closeAt,
+          pourG: rest,
+          cumulativeG: waterHot,
+          note: "關閉閥門 · 浸泡注水",
+        });
+        steps.push({
+          label: "開閥放流",
+          atSec: openAt,
+          pourG: 0,
+          cumulativeG: waterHot,
+          note: "打開閥門 · 約 2:10 滴完",
+        });
+        return steps;
+      }
       if (state.switchMode === "immersion-then-open") {
         steps.push({
           label: "關閥注水",
@@ -487,7 +520,9 @@
     else if (dose > 18) drain = 55 + Math.min(25, (dose - 18) * 2);
     if (isKalita(brewer)) drain += 10;
     if (isUfo(brewer)) drain += 5;
-    if (isSwitch(brewer) && state.switchMode !== "full-flow") {
+    if (state.switchMode === "resistance") {
+      drain = 10; // last open ~2:00 → finish ~2:10
+    } else if (usesValveControls(brewer) && state.switchMode !== "full-flow") {
       drain = 40;
     }
     if (iced || state.brewStyle === "iced") drain = Math.round(drain * 0.7);
@@ -518,7 +553,11 @@
     if (state.brewStyle === "cold") {
       parts.push("冷萃用粗研磨、雪櫃浸泡 " + state.coldSteepHours + " 小時，之後過濾。");
     }
-    if (isUfo(state.brewer)) {
+    if (state.switchMode === "resistance") {
+      parts.push(
+        "阻力 Resistance：UFO V3 坐 Switch 底座。0:00 開閥滲濾半水 → 約 0:58 關閥浸泡半水 → 2:00 開閥放流；總約 2:10。"
+      );
+    } else if (isUfo(state.brewer)) {
       parts.push("UFO V3 建議悶蒸約 60 秒，尾段可以稍為加大攪動。");
     } else if (isKalita(state.brewer)) {
       parts.push("Kalita Wave 平底流速穩，適合脈衝注水。");
@@ -529,6 +568,7 @@
         "full-flow": "全開流下（似 V60）",
         "immersion-then-open": "浸泡後開閥",
         hybrid: "混合（先關閥悶蒸再開閥續注）",
+        resistance: "阻力 Resistance（開→關→開）",
       }[state.switchMode];
       parts.push("Switch 模式：" + modeLabel + "。時間表會標示開關閥。");
     }
@@ -1178,7 +1218,7 @@
     const showPour = style === "pour-over" || style === "iced";
     const showBloom = style !== "cold";
     const showCold = style === "cold";
-    const showSwitch = isSwitch(state.brewer);
+    const showSwitch = usesValveControls(state.brewer);
     const showImmersionHold =
       showSwitch && state.switchMode !== "full-flow" ||
       (style === "immersion" && (BREWER_META[state.brewer] || {}).isImmersion);
